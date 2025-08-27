@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Consultorio Pediátrico 6 — Profesional de turno</title>
+  <meta name="description" content="Muestra automáticamente la foto del profesional de turno según la hora y el día." />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    /* ========= Paleta pastel del logo ========= */
+    :root{
+      --brand-ice:#c7e4f2;
+      --brand-cream:#f9f3ce;
+      --brand-peach:#f7d9a3;
+      --brand-blue:#9db3cb;
+      --brand-lav:#bcb7c7;
+      --neutral:#828282;
+
+      --bg:#ffffff;
+      --text:#3f3f46;
+      --muted:var(--neutral);
+      --accent:var(--brand-blue);
+      --accent-2:var(--brand-peach);
+      --ring:var(--brand-blue);
+      --card:#ffffffee;
+
+      /* Enfoques verticales */
+      --schedule-focus-y:16.67%; /* tercio superior en “Horarios” */
+      --oncall-focus-y:16.67%;   /* tercio superior en header */
+    }
+
+    html,body{height:100%;}
+    body{
+      margin:0; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background:
+        radial-gradient(1200px 700px at 10% -10%, var(--brand-ice) 0%, transparent 55%),
+        radial-gradient(1200px 700px at 120% 110%, var(--brand-cream) 0%, transparent 55%),
+        var(--bg);
+      color:var(--text); display:flex; align-items:center; justify-content:center; padding:24px;
+    }
+    .container{ width:min(1100px, 100%); }
+
+    /* ========= Header con recuadro a la izquierda ========= */
+    header{ margin-bottom:24px; }
+    .oncall-card.card{ display:flex; align-items:center; gap:16px; background:linear-gradient(180deg,#fff,#f9fafb); border:1px solid rgba(0,0,0,.06); border-radius:20px; padding:16px; box-shadow:0 10px 25px rgba(0,0,0,.08); }
+    .oncall-avatar{ width:clamp(72px,8vw,92px); aspect-ratio:1/1; border-radius:16px; overflow:hidden; background:#eef7fb; border:1px solid rgba(0,0,0,.08); flex:0 0 auto; }
+    .oncall-avatar img{ width:100%; height:100%; object-fit:cover; object-position:50% var(--oncall-focus-y); display:block; }
+    .oncall-info{ flex:1; min-width:0; }
+    .oncall-name{ font-weight:800; font-size:clamp(18px, 2.4vw, 28px); letter-spacing:-0.01em; }
+    .oncall-role{ color:var(--muted); margin-top:2px; }
+    .oncall-meta{ display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap; }
+    .oncall-right{ margin-left:auto; display:flex; gap:12px; align-items:center; }
+    .chip{ display:inline-flex; align-items:center; gap:8px; border:1px solid rgba(0,0,0,0.08); border-radius:999px; padding:6px 10px; font-size:0.85rem; color:#334155; background:linear-gradient(180deg, #ffffff, #f7fafc); }
+    .clock{ font-variant-numeric:tabular-nums; }
+
+    /* ===== Logo en cabecera (centrado) ===== */
+    .site-logo-bar{ display:flex; justify-content:center; align-items:center; margin:0 0 24px; }
+    .site-logo-img{ max-height:140px; height:auto; width:auto; object-fit:contain; }
+
+    /* ========= Tarjetas y grillas ========= */
+    .card{ background:linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.85)); border:1px solid rgba(0,0,0,0.06); border-radius:20px; padding:20px; backdrop-filter: blur(6px); box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
+    .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; }
+    .pro-card{ position:relative; overflow:hidden; border-radius:18px; border:1px solid rgba(0,0,0,0.06); background:#fff; }
+    .pro-media{ aspect-ratio:1/1; background:#eef7fb; }
+    .pro-media img{ width:100%; height:100%; object-fit:cover; display:block; object-position:50% 50%; } /* centrado por defecto */
+    #scheduleGrid .pro-media{ background:#f0f7fb; }
+    #scheduleGrid .pro-media img{ object-position:50% var(--schedule-focus-y); } /* tercio sup. en Horarios */
+
+    .pro-body{ padding:14px 14px 16px; }
+    .pro-name{ font-size:1.2rem; font-weight:700; letter-spacing:-0.01em; }
+    .pro-role{ color:var(--muted); font-size:0.95rem; margin-top:2px; }
+    .row{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .muted{ color:var(--muted); }
+    .empty{ text-align:center; padding:28px; border:1px dashed rgba(0,0,0,0.15); border-radius:16px; background:#fff; }
+
+    .toolbar{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+    .btn{ background:var(--accent); color:#0e1726; border:none; border-radius:999px; padding:10px 14px; font-weight:700; cursor:pointer; box-shadow:0 2px 0 rgba(0,0,0,0.05); text-decoration:none; }
+    .btn:focus{ outline:3px solid var(--ring); outline-offset:2px; }
+    .btn:hover{ filter:brightness(1.05); }
+    .select, .time-input{ background:#f8fafc; color:#0f172a; border:1px solid rgba(0,0,0,0.12); border-radius:10px; padding:8px 10px; }
+
+    /* ===== Estilos sección de horarios ===== */
+    details.schedule { margin-top:16px; }
+    details.schedule > summary{ cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:10px; font-weight:800; letter-spacing:-0.01em; }
+    details.schedule > summary::-webkit-details-marker { display:none; }
+    .summary-title{ display:flex; align-items:center; gap:10px; }
+    .summary-right{ display:flex; align-items:center; gap:10px; }
+    .hint{ font-size:0.9rem; color:var(--muted); }
+    .slot-line{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px; }
+    .slot-left{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .tiny{ font-size:0.85rem; color:#475569; }
+
+    footer{ margin-top:18px; color:var(--muted); font-size:0.9rem; }
+    a{ color:var(--accent-2); text-decoration:none; }
+    a:hover{ text-decoration:underline; }
+
+    /* ===== Responsive header ===== */
+    @media (max-width:640px){
+      .oncall-card.card{ flex-wrap:wrap; }
+      .oncall-right{ width:100%; justify-content:flex-start; margin-left:0; }
+      .oncall-avatar{ width:64px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- ===== Header minimalista con foto a la izquierda ===== -->
+    <header>
+      <div class="site-logo-bar">
+        <img src="img/Consultorio%206.png" alt="Consultorio 6 — Centro Pediátrico LeBlanc" class="site-logo-img" onerror="this.style.display='none'">
+      </div>
+      <div class="oncall-card card">
+        <div id="oncallAvatar" class="oncall-avatar" aria-hidden="true"></div>
+        <div class="oncall-info">
+          <div class="oncall-name" id="oncallName">—</div>
+          <div class="oncall-role" id="oncallRole"></div>
+          <div class="oncall-meta">
+            <span class="chip" id="oncallStatus">Fuera de horario</span>
+            <span class="muted" id="oncallTime">—</span>
+            <a class="btn" id="oncallCta" href="https://wa.link/73doc7" target="_blank" rel="noopener">Agendar Turno</a>
+          </div>
+        </div>
+        <div class="oncall-right">
+          <span class="chip clock" id="clockChip">--:--</span>
+          <span class="muted" id="tzLabel"></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Activos ahora -->
+    <section class="grid" id="activeGrid" aria-live="polite"></section>
+
+    <!-- Estado vacío -->
+    <div id="emptyState" class="empty card" hidden>
+      <h3 style="margin:0 0 8px; font-size:1.2rem">Estamos fuera de horario</h3>
+      <p style="margin:0 0 10px">No hay profesionales en turno en este momento.</p>
+      <div class="row">
+        <div>
+          <div class="muted">Próximo profesional</div>
+          <div id="nextWho" style="font-weight:700"></div>
+        </div>
+        <div class="chip"><span id="nextWhen">—</span></div>
+      </div>
+    </div>
+
+    <!-- Horarios (desplegada) -->
+    <details class="card schedule" close>
+      <summary>
+        <span class="summary-title">🗓️ Horarios de todos los profesionales</span>
+        <span class="summary-right hint">Tocá para contraer/expandir</span>
+      </summary>
+
+      <div class="toolbar" style="margin-top:12px">
+        <label for="dayFilter"><strong>Ver por día:</strong></label>
+        <select class="select" id="dayFilter" aria-label="Filtrar horarios por día">
+          <option value="-1">Semana completa</option>
+          <option value="1">Lunes</option>
+          <option value="2">Martes</option>
+          <option value="3">Miércoles</option>
+          <option value="4">Jueves</option>
+          <option value="5">Viernes</option>
+          <option value="6">Sábado</option>
+          <option value="0">Domingo</option>
+        </select>
+        <span class="muted">Los horarios se generan desde <code>SCHEDULE</code>.</span>
+      </div>
+
+      <section class="grid" id="scheduleGrid" style="margin-top:14px"></section>
+    </details>
+    <footer class="card" style="margin-top:16px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div>
+        <strong>Ubicación</strong>
+        <div class="muted">Abrir en Google Maps</div>
+      </div>
+      <a class="btn" href="https://maps.app.goo.gl/awv1s6TJpyy7cvwFA" target="_blank" rel="noopener">Ver mapa</a>
+    </footer>
+  </div>
+
+  <script>
+    // ================== CONFIGURACIÓN ==================
+    const LOGO_SRC = 'img/logo.jpg'; // fallback para header
+    const WA_BASE = 'https://wa.link/73doc7'; // enlace WhatsApp
+    // 0 = Domingo, 1 = Lunes, ... 6 = Sábado
+    const SCHEDULE = [
+      {
+        name: "Dr. Juan Angel Silva",
+        role: "Pediatra",
+        photo: "img/juanangel.jpg",
+        slots: [
+          { days:[1], start:"08:30", end:"12:00" },
+          { days:[4], start:"15:30", end:"19:30" },
+        ],
+      },
+      {
+        name: "Dr. Juan Del Puerto",
+        role: "Pediatra",
+        photo: "img/juan.jpg",
+        slots: [
+          { days:[4,5,6], start:"09:00", end:"12:00" },
+          { days:[5],   start:"13:00", end:"14:30" },
+        ],
+      },
+      {
+        name: "Dr. Carlos Vera",
+        role: "Pediatra",
+        photo: "img/carlos.jpg",
+        slots: [
+          { days:[1], start:"16:00", end:"20:00" },
+          { days:[3], start:"09:30", end:"12:00" },
+        ],
+      },
+      {
+        name: "Dra. Reny Villagra",
+        role: "Pediatra",
+        photo: "img/reny.jpg",
+        slots: [
+          { days:[2], start:"16:00", end:"19:30" },
+          { days:[3], start:"18:00", end:"20:00" },
+        ],
+      },
+      {
+        name: "Dra. Jessica Paniagüa",
+        role: "Pediatra",
+        photo: "img/jessi.jpg",
+        slots: [
+          { days:[2], start:"09:30", end:"12:00" },
+          { days:[3], start:"16:00", end:"18:00" },
+        ],
+      },
+      // Guardia nocturna (ejemplo)
+      // { name:"Guardia", role:"Pediatra de Guardia", photo:"img/guardia.jpg", slots:[ {days:[0,1,2,3,4,5,6], start:"21:00", end:"06:00"} ] },
+    ];
+
+    // ================ UTILIDADES DE TIEMPO ================
+    const pad = (n) => String(n).padStart(2, "0");
+    const parseHM = (hhmm) => { const [h,m] = hhmm.split(":").map(Number); return h*60 + m; };
+    const dayNamesShort = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+
+    function isNowInSlot(now, slot) {
+      const day = now.getDay();
+      if (!slot.days.includes(day)) return false;
+      const mins = now.getHours()*60 + now.getMinutes();
+      const start = parseHM(slot.start);
+      const end   = parseHM(slot.end);
+      if (start === end) return false;
+      if (end > start) {
+        return mins >= start && mins < end;
+      } else {
+        // cruza medianoche
+        return mins >= start || mins < end;
+      }
+    }
+
+    function nextStartAfter(now, slot) {
+      const startM = parseHM(slot.start);
+      const endM = parseHM(slot.end);
+      for (let add=0; add<14; add++) {
+        const d = new Date(now);
+        d.setHours(0,0,0,0);
+        d.setDate(d.getDate()+add);
+        const day = d.getDay();
+        if (!slot.days.includes(day)) continue;
+        const candidate = new Date(d);
+        candidate.setMinutes(startM, 0, 0);
+        if (add===0) {
+          const currentMins = now.getHours()*60 + now.getMinutes();
+          if (endM > startM) {
+            if (currentMins < startM) return candidate;
+          } else {
+            if (currentMins < endM) return candidate;
+            if (currentMins < startM) return candidate;
+          }
+        } else {
+          return candidate;
+        }
+      }
+      return null;
+    }
+
+    function getActiveProfessionals(now) {
+      return SCHEDULE.filter(p => p.slots.some(slot => isNowInSlot(now, slot)));
+    }
+
+    function getNextProfessional(now) {
+      let best = null;
+      for (const p of SCHEDULE) {
+        for (const slot of p.slots) {
+          const start = nextStartAfter(now, slot);
+          if (!start) continue;
+          if (!best || start < best.when) {
+            best = { who: p, when: start, slot };
+          }
+        }
+      }
+      return best;
+    }
+
+    function makeInitialsAvatar(name) {
+      const initials = name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join("");
+      const svg = `<?xml version="1.0" encoding="UTF-8"?>
+        <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#c7e4f2"/>
+              <stop offset="100%" stop-color="#f7d9a3"/>
+            </linearGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#g)"/>
+          <text x="50%" y="55%" font-size="240" text-anchor="middle" fill="#001018" font-family="Inter, system-ui" font-weight="800">${initials}</text>
+        </svg>`;
+      return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+    }
+
+    function imgWithFallback(src, alt, name) {
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.src = src;
+      img.alt = alt;
+      img.onerror = () => { img.onerror = null; img.src = makeInitialsAvatar(name); };
+      return img;
+    }
+
+    // ================== RENDER: Activos ahora & Header ==================
+    const elActiveGrid = document.getElementById('activeGrid');
+    const elEmpty = document.getElementById('emptyState');
+    const elNextWho = document.getElementById('nextWho');
+    const elNextWhen = document.getElementById('nextWhen');
+    const elClock = document.getElementById('clockChip');
+    const elTz = document.getElementById('tzLabel');
+
+    // Header elements
+    const elOncallAvatar = document.getElementById('oncallAvatar');
+    const elOncallName   = document.getElementById('oncallName');
+    const elOncallRole   = document.getElementById('oncallRole');
+    const elOncallTime   = document.getElementById('oncallTime');
+    const elOncallStatus = document.getElementById('oncallStatus');
+    const elOncallCta    = document.getElementById('oncallCta');
+
+    function formatDT(dt){
+      const days = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+      return `${days[dt.getDay()]} ${pad(dt.getDate())}/${pad(dt.getMonth()+1)} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+    }
+    function setWhatsAppLink(msg){
+      elOncallCta.href = `${WA_BASE}?text=${encodeURIComponent(msg)}`;
+    }
+
+    function render(now) {
+      // Reloj y TZ
+      elClock.textContent = new Intl.DateTimeFormat(undefined, { hour:'2-digit', minute:'2-digit', second:'2-digit' }).format(now);
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local';
+      elTz.textContent = `Zona: ${tz}`;
+
+      // Cabecera (médico de turno)
+      const active = getActiveProfessionals(now);
+      elOncallAvatar.innerHTML = '';
+      if (active.length) {
+        const p0 = active[0];
+        elOncallAvatar.appendChild(imgWithFallback(p0.photo, `Foto de ${p0.name}`, p0.name));
+        elOncallName.textContent = p0.name;
+        elOncallRole.textContent = p0.role || '';
+        const currentSlot = p0.slots.find(s => isNowInSlot(now, s));
+        elOncallStatus.textContent = active.length > 1 ? `En turno ahora (+${active.length-1})` : 'En turno ahora';
+        elOncallTime.textContent = currentSlot ? `Hasta las ${currentSlot.end}` : '';
+        const msg = currentSlot
+          ? `Hola, quisiera agendar un turno con ${p0.name} (hoy hasta ${currentSlot.end}).`
+          : `Hola, quisiera agendar un turno con ${p0.name}.`;
+        setWhatsAppLink(msg);
+      } else {
+        const next = getNextProfessional(now);
+        elOncallAvatar.innerHTML = '';
+        if (next) {
+          elOncallAvatar.appendChild(imgWithFallback(next.who.photo, `Foto de ${next.who.name}`, next.who.name));
+          elOncallName.textContent = next.who.name;
+          elOncallRole.textContent = next.who.role || '';
+          elOncallStatus.textContent = 'Próximo Turno';
+          const when = `${pad(next.when.getDate())}/${pad(next.when.getMonth()+1)} ${pad(next.when.getHours())}:${pad(next.when.getMinutes())}`;
+          elOncallTime.textContent = `Empieza ${when}`;
+          setWhatsAppLink(`Hola, quisiera agendar un turno con ${next.who.name} el ${formatDT(next.when)}.`);
+        } else {
+          // Si no hay próximo cargado, mostramos el logo (o avatar de iniciales) y mensaje genérico
+          elOncallAvatar.appendChild(imgWithFallback(LOGO_SRC, 'Logo del centro', 'Centro Pediátrico'));
+          elOncallName.textContent = 'Centro Pediátrico';
+          elOncallRole.textContent = 'Fuera de horario';
+          elOncallStatus.textContent = '—';
+          elOncallTime.textContent = '';
+          setWhatsAppLink('Hola, quisiera agendar un turno en Centro Pediátrico.');
+        }
+      }
+
+      // “Activos ahora”
+      elActiveGrid.innerHTML = '';
+      if (active.length) {
+        elEmpty.hidden = true;
+        const frag = document.createDocumentFragment();
+        active.forEach(p => {
+          const card = document.createElement('article');
+          card.className = 'pro-card';
+
+          const media = document.createElement('div');
+          media.className = 'pro-media';
+          media.appendChild(imgWithFallback(p.photo, `Foto de ${p.name}`, p.name));
+
+          const body = document.createElement('div');
+          body.className = 'pro-body';
+
+          const name = document.createElement('div');
+          name.className = 'pro-name';
+          name.textContent = p.name;
+
+          const role = document.createElement('div');
+          role.className = 'pro-role';
+          role.textContent = p.role;
+
+          const row = document.createElement('div');
+          row.className = 'row';
+
+          const chip = document.createElement('div');
+          chip.className = 'chip';
+          chip.innerHTML = '<span>En turno ahora</span>';
+
+          const until = document.createElement('div');
+          until.className = 'muted';
+          const currentSlot = p.slots.find(s => isNowInSlot(now, s));
+          if (currentSlot) { until.textContent = `Hasta las ${currentSlot.end}`; }
+
+          row.appendChild(chip);
+          row.appendChild(until);
+
+          body.appendChild(name);
+          body.appendChild(role);
+          body.appendChild(row);
+
+          card.appendChild(media);
+          card.appendChild(body);
+
+          frag.appendChild(card);
+        });
+        elActiveGrid.appendChild(frag);
+      } else {
+        elEmpty.hidden = false;
+        const next = getNextProfessional(now);
+        if (next) {
+          elNextWho.textContent = `${next.who.name} — ${next.who.role}`;
+          const when = `${pad(next.when.getDate())}/${pad(next.when.getMonth()+1)} ${pad(next.when.getHours())}:${pad(next.when.getMinutes())}`;
+          elNextWhen.textContent = `Empieza ${when}`;
+        } else {
+          elNextWho.textContent = '—';
+          elNextWhen.textContent = 'Sin programación próxima';
+        }
+      }
+    }
+
+    // ================== RENDER: Sección de horarios ==================
+    const elScheduleGrid = document.getElementById('scheduleGrid');
+    const elDayFilter = document.getElementById('dayFilter');
+
+    function formatDaysList(days){
+      const s = [...days].sort((a,b)=>a-b);
+      const isWeek = s.length===7;
+      const isWeekdays = s.join(",")==="1,2,3,4,5";
+      if (isWeek) return "Todos los días";
+      if (isWeekdays) return "Lun–Vie";
+      return s.map(d => ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"][d]).join(", ");
+    }
+
+    function renderSchedule(dayValue){
+      const day = Number(dayValue); // -1 (semana) o 0..6
+      elScheduleGrid.innerHTML = '';
+      const frag = document.createDocumentFragment();
+
+      SCHEDULE.forEach(p => {
+        const slotsToShow = (day === -1) ? p.slots : p.slots.filter(s => s.days.includes(day));
+
+        const card = document.createElement('article');
+        card.className = 'pro-card';
+
+        const media = document.createElement('div');
+        media.className = 'pro-media';
+        media.appendChild(imgWithFallback(p.photo, `Foto de ${p.name}`, p.name));
+
+        const body = document.createElement('div');
+        body.className = 'pro-body';
+
+        const name = document.createElement('div');
+        name.className = 'pro-name';
+        name.textContent = p.name;
+
+        const role = document.createElement('div');
+        role.className = 'pro-role';
+        role.textContent = p.role;
+
+        body.appendChild(name);
+        body.appendChild(role);
+
+        if (slotsToShow.length) {
+          slotsToShow.forEach(s => {
+            const line = document.createElement('div');
+            line.className = 'slot-line';
+
+            const left = document.createElement('div');
+            left.className = 'slot-left';
+
+            const chipDays = document.createElement('div');
+            chipDays.className = 'chip';
+            chipDays.textContent = (day === -1) ? formatDaysList(s.days) : dayNamesShort[day];
+
+            const chipTime = document.createElement('div');
+            chipTime.className = 'chip';
+            chipTime.textContent = `${s.start}–${s.end}`;
+
+            left.appendChild(chipDays);
+            left.appendChild(chipTime);
+
+            const note = document.createElement('div');
+            note.className = 'tiny';
+            note.textContent = (parseHM(s.end) <= parseHM(s.start)) ? 'Cruza medianoche' : '';
+
+            line.appendChild(left);
+            line.appendChild(note);
+            body.appendChild(line);
+          });
+        } else {
+          const none = document.createElement('div');
+          none.className = 'tiny muted';
+          none.style.marginTop = '10px';
+          none.textContent = (day === -1) ? '— Sin horarios cargados —' : `— No atiende los ${dayNamesShort[day]} —`;
+          body.appendChild(none);
+        }
+
+        card.appendChild(media);
+        card.appendChild(body);
+        frag.appendChild(card);
+      });
+
+      elScheduleGrid.appendChild(frag);
+    }
+
+    // ================ SIMULACIÓN ================ }); });
+
+    setInterval(() => { render(new Date()); }, 1000);
+
+    // Primer render
+    render(new Date());
+    // Render inicial de horarios
+    renderSchedule(elDayFilter.value);
+    elDayFilter.addEventListener('change', () => renderSchedule(elDayFilter.value));
+  </script>
+</body>
+</html>
